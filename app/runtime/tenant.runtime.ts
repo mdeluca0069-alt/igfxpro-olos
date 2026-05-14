@@ -1,19 +1,12 @@
-export interface TenantConfig {
-  id: string;
-  slug: string;
-  name: string;
-  region: string;
-}
+import type { TenantInfo } from "../../shared/schemas/tenant";
+import { resolveActiveTenant } from "../services/tenant.service";
 
-export async function loadTenantConfig(): Promise<TenantConfig | null> {
-  return {
-    id: "tenant_001",
-    slug: "default",
-    name: "OLOS Default Tenant",
-    region: "eu-west",
-  };
+export type TenantConfig = TenantInfo;
+
+export async function loadTenantConfig(): Promise<TenantConfig> {
+  return resolveActiveTenant();
 }
 
 export async function loadTenantSettings(): Promise<void> {
-  /* pull remote tenant overrides when API is ready */
+  /* Wire to `/tenant/settings` when your BFF exposes it. */
 }

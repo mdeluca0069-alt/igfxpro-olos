@@ -2,22 +2,22 @@
 
 import React, {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useState,
 } from "react";
+import {
+  ACCOUNT_TIER_SCHEMA,
+  type AccountTier,
+} from "../shared/schemas/auth.principal";
+import {
+  PRINCIPAL_CHANGED_EVENT,
+  readStoredPrincipal,
+} from "../shared/lib/principalStorage";
 
-/**
- * =========================================================
- * TYPES
- * =========================================================
- */
-
-export type AccountTier =
-  | "STANDARD"
-  | "VIP"
-  | "GOLD"
-  | "PLATINUM"
-  | "ENTERPRISE";
+export type { AccountTier };
 
 interface TierCapabilities {
   aiSignals: boolean;
@@ -36,33 +36,9 @@ interface TierProviderProps {
   children: React.ReactNode;
 }
 
-/**
- * =========================================================
- * CONTEXT
- * =========================================================
- */
+const TierContext = createContext<TierContextState | null>(null);
 
-const TierContext =
-  createContext<TierContextState | null>(null);
-
-/**
- * =========================================================
- * CURRENT USER TIER
- * =========================================================
- */
-
-const CURRENT_TIER: AccountTier = "ENTERPRISE";
-
-/**
- * =========================================================
- * CAPABILITIES
- * =========================================================
- */
-
-const capabilitiesMap: Record<
-  AccountTier,
-  TierCapabilities
-> = {
+const capabilitiesMap: Record<AccountTier, TierCapabilities> = {
   STANDARD: {
     aiSignals: false,
     marketDepth: false,
@@ -70,7 +46,6 @@ const capabilitiesMap: Record<
     executionPriority: false,
     hedgeTools: false,
   },
-
   VIP: {
     aiSignals: true,
     marketDepth: false,
@@ -78,7 +53,6 @@ const capabilitiesMap: Record<
     executionPriority: false,
     hedgeTools: false,
   },
-
   GOLD: {
     aiSignals: true,
     marketDepth: true,
@@ -86,7 +60,6 @@ const capabilitiesMap: Record<
     executionPriority: true,
     hedgeTools: false,
   },
-
   PLATINUM: {
     aiSignals: true,
     marketDepth: true,
@@ -94,7 +67,6 @@ const capabilitiesMap: Record<
     executionPriority: true,
     hedgeTools: true,
   },
-
   ENTERPRISE: {
     aiSignals: true,
     marketDepth: true,
@@ -104,22 +76,36 @@ const capabilitiesMap: Record<
   },
 };
 
-/**
- * =========================================================
- * COMPONENT
- * =========================================================
- */
+function readTierFromPrincipalStore(): AccountTier {
+  const principal = readStoredPrincipal();
+  if (!principal) return "STANDARD";
+  const parsed = ACCOUNT_TIER_SCHEMA.safeParse(principal.tier);
+  return parsed.success ? parsed.data : "STANDARD";
+}
 
-export const TierProvider: React.FC<
-  TierProviderProps
-> = ({ children }) => {
+export const TierProvider: React.FC<TierProviderProps> = ({
+  children,
+}) => {
+  const [tier, setTier] = useState<AccountTier>(readTierFromPrincipalStore);
+
+  const syncFromStore = useCallback(() => {
+    setTier(readTierFromPrincipalStore());
+  }, []);
+
+  useEffect(() => {
+    syncFromStore();
+    window.addEventListener(PRINCIPAL_CHANGED_EVENT, syncFromStore);
+    return () => {
+      window.removeEventListener(PRINCIPAL_CHANGED_EVENT, syncFromStore);
+    };
+  }, [syncFromStore]);
+
   const value = useMemo(() => {
     return {
-      tier: CURRENT_TIER,
-      capabilities:
-        capabilitiesMap[CURRENT_TIER],
+      tier,
+      capabilities: capabilitiesMap[tier],
     };
-  }, []);
+  }, [tier]);
 
   return (
     <TierContext.Provider value={value}>
@@ -128,19 +114,11 @@ export const TierProvider: React.FC<
   );
 };
 
-/**
- * =========================================================
- * HOOK
- * =========================================================
- */
-
 export const useTier = () => {
   const context = useContext(TierContext);
 
   if (!context) {
-    throw new Error(
-      "useTier must be used inside TierProvider"
-    );
+    throw new Error("useTier must be used inside TierProvider");
   }
 
   return context;

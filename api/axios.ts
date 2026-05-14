@@ -1,36 +1,16 @@
-import axios from "axios";
+import type { AxiosInstance } from "axios";
+import { getApiClient } from "./httpClient";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-
-export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000,
-  withCredentials: true,
+/**
+ * Lazy `AxiosInstance` — first property access initializes the instrumented client.
+ * Preserves legacy `import { apiClient } from "../axios"` import paths.
+ */
+export const apiClient = new Proxy({} as AxiosInstance, {
+  get(_target, prop, receiver) {
+    const inst = getApiClient();
+    const value = Reflect.get(inst, prop, receiver);
+    return typeof value === "function"
+      ? (value as (...args: unknown[]) => unknown).bind(inst)
+      : value;
+  },
 });
-
-// GLOBAL HEADERS INJECTION
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
-  const tenant = localStorage.getItem("tenant_id");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  if (tenant) {
-    config.headers["x-tenant-id"] = tenant;
-  }
-
-  config.headers["x-client"] = "olos-frontend";
-
-  return config;
-});
-
-// GLOBAL RESPONSE HANDLING
-apiClient.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    console.error("[API ERROR]", err?.response?.data || err.message);
-    return Promise.reject(err);
-  }
-);

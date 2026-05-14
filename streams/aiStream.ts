@@ -11,8 +11,9 @@ class AIStream {
   private handlers: ((data: AISignal) => void)[] = [];
 
   constructor() {
-    unifiedStream.on("ai", (data: AISignal) => {
-      this.handlers.forEach((h) => h(data));
+    unifiedStream.on("ai", (data: unknown) => {
+      const signal = data as AISignal;
+      this.handlers.forEach((h) => h(signal));
     });
   }
 

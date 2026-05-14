@@ -12,6 +12,7 @@ export default defineConfig({
       "@app": path.resolve(__dirname, "app"),
       "@api": path.resolve(__dirname, "api"),
       "@streams": path.resolve(__dirname, "streams"),
+      "@shared": path.resolve(__dirname, "shared"),
     },
   },
 });

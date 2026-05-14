@@ -1,3 +1,5 @@
+import { wsClient } from "../../api/websocket";
+
 /**
  * Realtime wiring. WebSocket is lazy; boot should not fail if the gateway is down.
  */
@@ -6,9 +8,18 @@ export async function connectRealtime(): Promise<{
   market: boolean;
   api: boolean;
 }> {
-  return {
-    websocket: true,
-    market: true,
-    api: true,
-  };
+  try {
+    wsClient.connect();
+    return {
+      websocket: true,
+      market: true,
+      api: true,
+    };
+  } catch {
+    return {
+      websocket: false,
+      market: false,
+      api: true,
+    };
+  }
 }

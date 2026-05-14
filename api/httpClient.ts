@@ -1,4 +1,5 @@
 import axios, {
+  AxiosHeaders,
   type AxiosError,
   type AxiosInstance,
   type InternalAxiosRequestConfig,
@@ -9,7 +10,7 @@ import { createLogger } from "../shared/lib/logger";
 import { tokenVault } from "../shared/lib/tokenVault";
 import { getAuthHttp } from "./authHttp";
 import { mapAxiosError } from "./error.mapper";
-import { SessionTokensSchema } from "../shared/schemas/auth.principal";
+import { parseTokenBundle } from "../shared/schemas/auth.principal";
 
 const log = createLogger("http");
 const kAuthRetry = Symbol("olos.authRetry");
@@ -26,13 +27,11 @@ async function refreshAccessToken(): Promise<string | null> {
     if (!refresh) return null;
 
     try {
-      const res = await getAuthHttp().post(
-        env.AUTH_REFRESH_PATH,
-        { refreshToken: refresh },
-        { headers: { "x-skip-auth-refresh": "1" } }
-      );
+      const res = await getAuthHttp().post(env.AUTH_REFRESH_PATH, {
+        refreshToken: refresh,
+      });
 
-      const tokens = SessionTokensSchema.parse(res.data);
+      const tokens = parseTokenBundle(res.data);
       tokenVault.setAccessToken(tokens.accessToken);
       if (tokens.refreshToken) {
         tokenVault.setRefreshToken(tokens.refreshToken);
@@ -58,62 +57,65 @@ async function refreshAccessToken(): Promise<string | null> {
 function attachInterceptors(instance: AxiosInstance): void {
   instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     const env = getClientEnv();
+    const headers = AxiosHeaders.from(config.headers ?? {});
 
-    const headers = config.headers;
     headers.set("x-request-id", createCorrelationId());
     headers.set("x-client", env.CLIENT_NAME);
 
-    const skipRefresh = headers.get("x-skip-auth-refresh") === "1";
-    if (skipRefresh) {
-      headers.delete("x-skip-auth-refresh");
-      return config;
-    }
-
     const access = tokenVault.getAccessToken();
     if (access) {
-      headers.setAuthorization(`Bearer ${access}`, true);
+      headers.set("Authorization", `Bearer ${access}`);
     }
 
     const tenant = tokenVault.getTenantId();
     if (tenant) {
-      headers.set("x-tenant-id", tenant, false);
+      headers.set("x-tenant-id", tenant);
     }
 
+    config.headers = headers;
     return config;
   });
 
   instance.interceptors.response.use(
     (res) => res,
     async (error: AxiosError) => {
-      const cfg = error.config as (InternalAxiosRequestConfig & {
-        [kAuthRetry]?: boolean;
-      }) | undefined;
+      const cfg = error.config as
+        | (InternalAxiosRequestConfig & { [kAuthRetry]?: boolean })
+        | undefined;
 
       const mapped = mapAxiosError(error);
       log.warn("request failed", { error: mapped });
 
       const status = error.response?.status;
+      const env = getClientEnv();
 
       if (
         status === 401 &&
         cfg &&
         !cfg[kAuthRetry] &&
-        !cfg.url?.includes(getClientEnv().AUTH_REFRESH_PATH)
+        !String(cfg.url ?? "").includes(env.AUTH_REFRESH_PATH)
       ) {
         cfg[kAuthRetry] = true;
         const next = await refreshAccessToken();
         if (next) {
-          cfg.headers.setAuthorization(`Bearer ${next}`, true);
-          return instance(cfg);
+          const headers = AxiosHeaders.from(cfg.headers ?? {});
+          headers.set("Authorization", `Bearer ${next}`);
+          cfg.headers = headers;
+          return instance.request(cfg);
         }
       }
 
       if (status === 401) {
-        tokenVault.clearSession();
-        const returnTo = encodeURIComponent(
-          `${window.location.pathname}${window.location.search}`
+        const hadAuth = Boolean(
+          AxiosHeaders.from(cfg?.headers ?? {}).get("Authorization")
         );
-        window.location.assign(`/login?returnTo=${returnTo}`);
+        tokenVault.clearSession();
+        if (hadAuth) {
+          const returnTo = encodeURIComponent(
+            `${window.location.pathname}${window.location.search}`
+          );
+          window.location.assign(`/login?returnTo=${returnTo}`);
+        }
       }
 
       return Promise.reject(mapped);

@@ -8,16 +8,16 @@ type StreamEvent =
   | "portfolio"
   | "risk";
 
-type Handler = (data: any) => void;
+type Handler = (data: unknown) => void;
 
 class UnifiedStream {
-  private handlers: Map<StreamEvent, Handler[]> = new Map();
+  private readonly handlers = new Map<StreamEvent, Handler[]>();
+  private wired = false;
 
-  constructor() {
-    this.init();
-  }
+  private ensureTransport(): void {
+    if (this.wired) return;
+    this.wired = true;
 
-  private init() {
     wsClient.connect();
 
     wsClient.on("market", (data) => this.emit("market", data));
@@ -28,20 +28,28 @@ class UnifiedStream {
     wsClient.on("risk", (data) => this.emit("risk", data));
   }
 
-  on(event: StreamEvent, handler: Handler) {
+  on(event: StreamEvent, handler: Handler): void {
+    this.ensureTransport();
     if (!this.handlers.has(event)) {
       this.handlers.set(event, []);
     }
     this.handlers.get(event)!.push(handler);
   }
 
-  emit(event: StreamEvent, data: any) {
+  emit(event: StreamEvent, data: unknown): void {
     const list = this.handlers.get(event);
     if (!list) return;
-    list.forEach((h) => h(data));
+    list.forEach((h) => {
+      try {
+        h(data);
+      } catch {
+        /* isolate subscriber failures */
+      }
+    });
   }
 
-  send(event: StreamEvent, payload: any) {
+  send(event: StreamEvent, payload: unknown): void {
+    this.ensureTransport();
     wsClient.send(event, payload);
   }
 }

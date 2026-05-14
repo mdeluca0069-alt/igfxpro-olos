@@ -11,7 +11,8 @@ class MarketStream {
   private subscribers: Map<string, ((tick: Tick) => void)[]> = new Map();
 
   constructor() {
-    unifiedStream.on("market", (tick: Tick) => {
+    unifiedStream.on("market", (data: unknown) => {
+      const tick = data as Tick;
       this.dispatch(tick);
     });
   }

@@ -1,23 +1,14 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-
-export type TenantBranding = {
-  accent: string;
-  logoUrl?: string;
-};
-
-export type TenantInfo = {
-  id: string;
-  slug: string;
-  name: string;
-  region: string;
-  branding: TenantBranding;
-};
+import type { TenantInfo } from "../shared/schemas/tenant";
+import { FALLBACK_TENANT } from "../shared/schemas/tenant";
+import { hydrateTenantFromApi } from "./services/tenant.service";
 
 type TenantContextState = {
   tenant: TenantInfo;
@@ -26,20 +17,29 @@ type TenantContextState = {
 
 const TenantContext = createContext<TenantContextState | null>(null);
 
-const defaultTenant: TenantInfo = {
-  id: "tenant_001",
-  slug: "default",
-  name: "OLOS Workspace",
-  region: "eu-west",
-  branding: { accent: "#22d3ee" },
-};
-
 type Props = {
   children: ReactNode;
 };
 
+export type { TenantInfo };
+
 export function TenantProvider({ children }: Props) {
-  const [tenant, setTenant] = useState<TenantInfo>(defaultTenant);
+  const [tenant, setTenant] = useState<TenantInfo>(FALLBACK_TENANT);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const next = await hydrateTenantFromApi();
+        if (!cancelled) setTenant(next);
+      } catch {
+        if (!cancelled) setTenant(FALLBACK_TENANT);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const value = useMemo(
     () => ({

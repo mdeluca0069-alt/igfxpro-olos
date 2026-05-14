@@ -8,20 +8,12 @@ import React, {
   useMemo,
   useState,
 } from "react";
-
-/**
- * =========================================================
- * TYPES
- * =========================================================
- */
-
-interface FeatureFlags {
-  aiTrading: boolean;
-  smartSignals: boolean;
-  brokerControlCenter: boolean;
-  hedgeAutomation: boolean;
-  institutionalCharts: boolean;
-}
+import {
+  DEFAULT_FEATURE_FLAGS,
+  type FeatureFlags,
+  FeatureFlagsSchema,
+} from "../shared/schemas/featureFlags";
+import { loadFeatureFlagsForShell } from "./services/featureFlags.service";
 
 interface FeatureFlagContextState {
   flags: FeatureFlags;
@@ -33,54 +25,13 @@ interface FeatureFlagProviderProps {
   children: React.ReactNode;
 }
 
-/**
- * =========================================================
- * CONTEXT
- * =========================================================
- */
-
 const FeatureFlagContext =
-  createContext<FeatureFlagContextState | null>(
-    null
-  );
-
-/**
- * =========================================================
- * MOCK FLAGS
- * =========================================================
- */
-
-const fetchFlags =
-  async (): Promise<FeatureFlags> => {
-    return {
-      aiTrading: true,
-      smartSignals: true,
-      brokerControlCenter: true,
-      hedgeAutomation: true,
-      institutionalCharts: true,
-    };
-  };
-
-const EMPTY_FLAGS: FeatureFlags = {
-  aiTrading: false,
-  smartSignals: false,
-  brokerControlCenter: false,
-  hedgeAutomation: false,
-  institutionalCharts: false,
-};
-
-/**
- * =========================================================
- * COMPONENT
- * =========================================================
- */
+  createContext<FeatureFlagContextState | null>(null);
 
 export const FeatureFlagProvider: React.FC<
   FeatureFlagProviderProps
 > = ({ children }) => {
-  const [flags, setFlags] =
-    useState<FeatureFlags | null>(null);
-
+  const [flags, setFlags] = useState<FeatureFlags | null>(null);
   const [loading, setLoading] = useState(true);
 
   const isEnabled = useCallback(
@@ -96,41 +47,34 @@ export const FeatureFlagProvider: React.FC<
 
   const contextValue = useMemo(() => {
     return {
-      flags: flags ?? EMPTY_FLAGS,
+      flags: flags ?? DEFAULT_FEATURE_FLAGS,
       loading,
       isEnabled,
     };
   }, [flags, loading, isEnabled]);
 
-  /**
-   * =========================================================
-   * LOAD FLAGS
-   * =========================================================
-   */
-
   useEffect(() => {
     const initializeFlags = async () => {
       try {
-        const data = await fetchFlags();
-
-        setFlags(data);
-      } catch (error) {
-        console.error(
-          "Feature flag initialization failed:",
-          error
-        );
+        const data = await loadFeatureFlagsForShell();
+        const checked = FeatureFlagsSchema.safeParse(data);
+        setFlags(checked.success ? checked.data : DEFAULT_FEATURE_FLAGS);
+      } catch {
+        setFlags(DEFAULT_FEATURE_FLAGS);
       } finally {
         setLoading(false);
       }
     };
 
-    initializeFlags();
+    void initializeFlags();
   }, []);
 
   if (loading && !flags) {
     return (
-      <div className="w-screen h-screen bg-black text-white flex items-center justify-center">
-        Loading Features...
+      <div className="flex h-screen w-screen items-center justify-center bg-black text-white">
+        <div className="text-sm tracking-wide text-slate-400">
+          Caricamento capability map…
+        </div>
       </div>
     );
   }
@@ -142,16 +86,8 @@ export const FeatureFlagProvider: React.FC<
   );
 };
 
-/**
- * =========================================================
- * HOOK
- * =========================================================
- */
-
 export const useFeatureFlags = () => {
-  const context = useContext(
-    FeatureFlagContext
-  );
+  const context = useContext(FeatureFlagContext);
 
   if (!context) {
     throw new Error(

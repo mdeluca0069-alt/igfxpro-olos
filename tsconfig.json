@@ -14,7 +14,19 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"]
+    }
   },
-  "include": ["main.tsx", "vite-env.d.ts", "app/**/*.ts", "app/**/*.tsx", "api/**/*.ts", "streams/**/*.ts"]
+  "include": [
+    "main.tsx",
+    "vite-env.d.ts",
+    "shared/**/*.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "api/**/*.ts",
+    "streams/**/*.ts"
+  ]
 }

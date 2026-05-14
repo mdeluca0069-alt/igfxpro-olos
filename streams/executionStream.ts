@@ -11,7 +11,8 @@ class ExecutionStream {
   private handlers: ((e: ExecutionEvent) => void)[] = [];
 
   constructor() {
-    unifiedStream.on("execution", (e: ExecutionEvent) => {
+    unifiedStream.on("execution", (data: unknown) => {
+      const e = data as ExecutionEvent;
       this.handlers.forEach((h) => h(e));
     });
   }

@@ -1,5 +1,3 @@
-// frontend/app/AuthGate.tsx
-
 import React, {
   createContext,
   useContext,
@@ -7,212 +5,151 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import type { AccountTier, Principal } from "../shared/schemas/auth.principal";
+import {
+  bootstrapAuth,
+  type AuthBootstrapResult,
+} from "./services/auth.service";
 
-/**
- * =========================================================
- * TYPES
- * =========================================================
- */
-
-interface AuthUser {
+export interface AuthUser {
   id: string;
   email: string;
   role: string;
   permissions: string[];
   tenantId: string;
-}
-
-interface AuthContextState {
-  authenticated: boolean;
-  loading: boolean;
-  user: AuthUser | null;
-  token: string | null;
+  tier: AccountTier;
 }
 
 interface AuthGateProps {
   children: React.ReactNode;
 }
 
-/**
- * =========================================================
- * CONTEXT
- * =========================================================
- */
-
-const AuthContext =
-  createContext<AuthContextState | null>(null);
-
-/**
- * =========================================================
- * MOCK API CALLS
- * Replace with real APIs
- * =========================================================
- */
-
-const validateToken = async (
-  token: string
-): Promise<boolean> => {
-  await new Promise((r) => setTimeout(r, 400));
-
-  return !!token;
+type AuthViewContext = {
+  authenticated: boolean;
+  loading: boolean;
+  user: AuthUser | null;
+  token: string | null;
 };
 
-const refreshToken = async () => {
-  return "new-access-token";
+type AuthGateInternalState = AuthViewContext & {
+  lastFailure: AuthBootstrapResult | null;
 };
 
-const fetchUser = async (): Promise<AuthUser> => {
+const AuthContext = createContext<AuthViewContext | null>(null);
+
+function principalToAuthUser(p: Principal): AuthUser {
   return {
-    id: "usr_001",
-    email: "user@olos.ai",
-    role: "enterprise",
-    permissions: [
-      "trade.execute",
-      "admin.access",
-      "signals.view",
-    ],
-    tenantId: "tenant_001",
+    id: p.sub,
+    email: p.email ?? "",
+    role: p.roles[0] ?? "trader",
+    permissions: p.permissions,
+    tenantId: p.tenantId,
+    tier: p.tier,
   };
-};
+}
 
-/**
- * =========================================================
- * AUTH GATE
- * =========================================================
- */
+const Shell = ({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) => (
+  <div className="flex min-h-screen flex-col items-center justify-center bg-[#05070b] px-6 text-center text-slate-100">
+    <div className="max-w-md border border-slate-800 bg-[#0b1020] p-10 shadow-2xl">
+      <p className="text-xs font-semibold uppercase tracking-[0.35em] text-cyan-400">
+        OLOS
+      </p>
+      <h1 className="mt-4 text-2xl font-semibold tracking-tight">{title}</h1>
+      <p className="mt-3 text-sm leading-relaxed text-slate-400">{subtitle}</p>
+    </div>
+  </div>
+);
 
-export const AuthGate: React.FC<AuthGateProps> = ({
-  children,
-}) => {
-  const [state, setState] =
-    useState<AuthContextState>({
-      authenticated: false,
-      loading: true,
-      user: null,
-      token: null,
-    });
+export const AuthGate: React.FC<AuthGateProps> = ({ children }) => {
+  const [state, setState] = useState<AuthGateInternalState>({
+    authenticated: false,
+    loading: true,
+    user: null,
+    token: null,
+    lastFailure: null,
+  });
 
-  /**
-   * =========================================================
-   * AUTH FLOW
-   * =========================================================
-   */
+  useEffect(() => {
+    let cancelled = false;
 
-  const initializeAuth = async () => {
-    try {
-      let token =
-        localStorage.getItem("access_token");
+    const run = async () => {
+      const result = await bootstrapAuth();
+      if (cancelled) return;
 
-      /**
-       * TOKEN VALIDATION
-       */
-
-      let valid = false;
-
-      if (token) {
-        valid = await validateToken(token);
-      }
-
-      /**
-       * REFRESH TOKEN
-       */
-
-      if (!valid) {
-        token = await refreshToken();
-      }
-
-      if (token) {
-        localStorage.setItem("access_token", token);
-      }
-
-      /**
-       * FAILED AUTH
-       */
-
-      if (!token) {
-        return setState({
-          authenticated: false,
+      if (result.ok) {
+        setState({
+          authenticated: true,
           loading: false,
-          user: null,
-          token: null,
+          user: principalToAuthUser(result.principal),
+          token: result.accessToken,
+          lastFailure: null,
         });
+        return;
       }
-
-      /**
-       * LOAD USER
-       */
-
-      const user = await fetchUser();
-
-      /**
-       * SUCCESS
-       */
-
-      setState({
-        authenticated: true,
-        loading: false,
-        user,
-        token,
-      });
-    } catch (error) {
-      console.error("AuthGate Failed:", error);
 
       setState({
         authenticated: false,
         loading: false,
         user: null,
         token: null,
+        lastFailure: result,
       });
-    }
-  };
+    };
 
-  /**
-   * =========================================================
-   * INIT
-   * =========================================================
-   */
+    void run();
 
-  useEffect(() => {
-    initializeAuth();
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  /**
-   * =========================================================
-   * LOADING
-   * =========================================================
-   */
 
   if (state.loading) {
     return (
-      <div className="w-screen h-screen bg-black flex items-center justify-center text-white">
-        Authenticating...
-      </div>
+      <Shell
+        title="Autenticazione in corso"
+        subtitle="Stabilimento sessione sicura e verifica credenziali presso il gateway istituzionale."
+      />
     );
   }
-
-  /**
-   * =========================================================
-   * BLOCK ACCESS
-   * =========================================================
-   */
 
   if (!state.authenticated) {
+    const lf = state.lastFailure;
+    const reason =
+      lf && lf.ok === false ? lf.reason : "unauthenticated";
+    const detail =
+      lf && lf.ok === false && "detail" in lf ? lf.detail : undefined;
+
     return (
-      <div className="w-screen h-screen bg-black flex items-center justify-center text-white">
-        Access Denied
-      </div>
+      <Shell
+        title="Accesso non consentito"
+        subtitle={
+          reason === "unauthenticated"
+            ? "Sessione assente o scaduta. Effettua l'accesso tramite il portale broker per continuare."
+            : reason === "invalid_session"
+              ? "La sessione non è più valida. Ripeti l'accesso per ottenere nuove credenziali."
+              : `Autenticazione non completata (${reason}).${
+                  detail ? ` Dettaglio: ${detail}` : ""
+                }`
+        }
+      />
     );
   }
 
-  /**
-   * =========================================================
-   * CONTEXT
-   * =========================================================
-   */
-
-  const contextValue = useMemo(() => {
-    return state;
-  }, [state]);
+  const contextValue = useMemo(
+    () => ({
+      authenticated: state.authenticated,
+      loading: state.loading,
+      user: state.user,
+      token: state.token,
+    }),
+    [state.authenticated, state.loading, state.user, state.token]
+  );
 
   return (
     <AuthContext.Provider value={contextValue}>
@@ -221,19 +158,11 @@ export const AuthGate: React.FC<AuthGateProps> = ({
   );
 };
 
-/**
- * =========================================================
- * HOOK
- * =========================================================
- */
-
 export const useAuth = () => {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error(
-      "useAuth must be used inside AuthGate"
-    );
+    throw new Error("useAuth must be used inside AuthGate");
   }
 
   return context;

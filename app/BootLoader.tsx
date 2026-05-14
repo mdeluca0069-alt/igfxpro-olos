@@ -266,12 +266,7 @@ export const BootLoader: React.FC<BootLoaderProps> = ({
 
       const tenant = await loadTenantConfig();
 
-      if (!tenant) {
-        return handleFatalError(
-          "TENANT_INVALID",
-          "Unable to load tenant configuration."
-        );
-      }
+      void tenant;
 
       /**
        * ============================================
