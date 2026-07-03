@@ -1,211 +1,125 @@
-// frontend/app/ServiceHealthChecker.tsx
-
-import React, { useEffect, useMemo, useState } from "react";
-
 /**
- * =========================================================
- * TYPES
- * =========================================================
+ * ServiceHealthChecker — real infrastructure telemetry from /api/v1/telemetry/health.
+ *
+ * Replaces the former Math.random() fake latency implementation.
+ * Polls every 30 seconds. Only renders on /admin route.
  */
+import { useEffect, useState } from "react";
+import { useLocation }         from "react-router-dom";
+import { getApiClient }        from "../api/httpClient";
 
-type ServiceStatus =
-  | "operational"
-  | "degraded"
-  | "offline";
+type ServiceStatus = "operational" | "degraded" | "offline";
 
 interface ServiceHealth {
-  name: string;
-  status: ServiceStatus;
-  latency: number;
-  lastHeartbeat: number;
+  name:      string;
+  status:    ServiceStatus;
+  latencyMs: number;
+  detail:    string;
 }
 
-interface HealthState {
-  services: ServiceHealth[];
+interface TelemetryResponse {
+  services:      ServiceHealth[];
+  processUptime: number;
+  wsConnections: number;
+  httpTotal:     number;
+  generatedAt:   string;
 }
 
-/**
- * =========================================================
- * MOCK SERVICE CHECKERS
- * Replace with real API checks
- * =========================================================
- */
-
-const checkService = async (
-  serviceName: string
-): Promise<ServiceHealth> => {
-  const latency = Math.floor(Math.random() * 200);
-
-  return {
-    name: serviceName,
-    status:
-      latency < 100
-        ? "operational"
-        : latency < 160
-        ? "degraded"
-        : "offline",
-    latency,
-    lastHeartbeat: Date.now(),
-  };
+const STATUS_DOT: Record<ServiceStatus, string> = {
+  operational: "bg-emerald-500",
+  degraded:    "bg-amber-500",
+  offline:     "bg-rose-500",
 };
-
-/**
- * =========================================================
- * SERVICES
- * =========================================================
- */
-
-const SERVICES = [
-  "api-gateway",
-  "websocket",
-  "market-stream",
-  "execution-engine",
-  "ai-engine",
-  "calendar-service",
-  "notification-service",
-  "auth-service",
-];
-
-/**
- * =========================================================
- * STATUS COLOR
- * =========================================================
- */
-
-const getStatusColor = (status: ServiceStatus) => {
-  switch (status) {
-    case "operational":
-      return "bg-green-500";
-
-    case "degraded":
-      return "bg-yellow-500";
-
-    case "offline":
-      return "bg-red-500";
-
-    default:
-      return "bg-gray-500";
-  }
-};
-
-/**
- * =========================================================
- * COMPONENT
- * =========================================================
- */
 
 export const ServiceHealthChecker: React.FC = () => {
-  const [healthState, setHealthState] =
-    useState<HealthState>({
-      services: [],
-    });
-
-  /**
-   * =========================================================
-   * HEARTBEAT LOOP
-   * =========================================================
-   */
+  const location  = useLocation();
+  const [data, setData]       = useState<TelemetryResponse | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
+    if (location.pathname !== "/admin") return;
 
-    const monitorServices = async () => {
-      const results = await Promise.all(
-        SERVICES.map((service) =>
-          checkService(service)
-        )
-      );
+    let mounted = true;
 
-      setHealthState({
-        services: results,
-      });
+    const poll = async () => {
+      if (!mounted) return;
+      setLoading(true);
+      try {
+        const client = getApiClient();
+        const resp: TelemetryResponse = await client.get("/api/v1/telemetry/health");
+        if (mounted) setData(resp);
+      } catch {
+        // Network error — keep previous state
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
 
-    monitorServices();
+    void poll();
+    const interval = setInterval(poll, 30_000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, [location.pathname]);
 
-    interval = setInterval(monitorServices, 5000);
+  if (location.pathname !== "/admin") return null;
 
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
+  const globalStatus: ServiceStatus = !data ? "offline"
+    : data.services.some((s) => s.status === "offline")    ? "offline"
+    : data.services.some((s) => s.status === "degraded")   ? "degraded"
+    : "operational";
 
-  /**
-   * =========================================================
-   * GLOBAL STATUS
-   * =========================================================
-   */
-
-  const globalStatus = useMemo(() => {
-    if (
-      healthState.services.some(
-        (s) => s.status === "offline"
-      )
-    ) {
-      return "offline";
-    }
-
-    if (
-      healthState.services.some(
-        (s) => s.status === "degraded"
-      )
-    ) {
-      return "degraded";
-    }
-
-    return "operational";
-  }, [healthState]);
-
-  /**
-   * =========================================================
-   * UI
-   * =========================================================
-   */
+  const uptime = data
+    ? data.processUptime < 3600
+      ? `${Math.round(data.processUptime / 60)}m uptime`
+      : `${Math.round(data.processUptime / 3600)}h uptime`
+    : "";
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] w-[340px] rounded-2xl bg-[#0B1020] border border-[#1E293B] shadow-2xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-white font-semibold">
-            Service Health
-          </h2>
-
-          <p className="text-xs text-gray-400">
-            Realtime infrastructure monitor
+          <h2 className="text-white font-semibold text-sm">Service Health</h2>
+          <p className="text-[11px] text-slate-500">
+            {loading ? "Refreshing…" : uptime || "Live telemetry"}
           </p>
         </div>
-
-        <div
-          className={`w-3 h-3 rounded-full ${getStatusColor(
-            globalStatus
-          )}`}
-        />
+        <div className={`w-3 h-3 rounded-full ${STATUS_DOT[globalStatus]}`} />
       </div>
 
-      <div className="space-y-3">
-        {healthState.services.map((service) => (
-          <div
-            key={service.name}
-            className="flex items-center justify-between"
-          >
-            <div>
-              <div className="text-sm text-white">
-                {service.name}
+      {!data ? (
+        <p className="text-[11px] text-slate-600 text-center py-4">Loading…</p>
+      ) : (
+        <div className="space-y-2.5">
+          {data.services.map((svc) => (
+            <div key={svc.name} className="flex items-center justify-between">
+              <div>
+                <p className="text-[12px] text-white capitalize">{svc.name.replace(/-/g, " ")}</p>
+                <p className="text-[10px] text-slate-600">{svc.detail}</p>
               </div>
-
-              <div className="text-xs text-gray-500">
-                {service.latency}ms
+              <div className="flex items-center gap-2 text-right">
+                {svc.latencyMs > 0 && (
+                  <span className="text-[10px] font-mono text-slate-500">{svc.latencyMs}ms</span>
+                )}
+                <div className={`w-2 h-2 rounded-full ${STATUS_DOT[svc.status]}`} />
               </div>
             </div>
+          ))}
 
-            <div
-              className={`w-2 h-2 rounded-full ${getStatusColor(
-                service.status
-              )}`}
-            />
+          <div className="mt-2 border-t border-slate-800/60 pt-2 grid grid-cols-2 gap-1">
+            <div className="text-[10px] text-slate-600">
+              WS connections: <span className="text-slate-400">{data.wsConnections}</span>
+            </div>
+            <div className="text-[10px] text-slate-600">
+              HTTP total: <span className="text-slate-400">{data.httpTotal}</span>
+            </div>
           </div>
-        ))}
-      </div>
+
+          {data.generatedAt && (
+            <p className="text-[9px] text-slate-700 text-right">
+              As of {new Date(data.generatedAt).toLocaleTimeString("en-GB")}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 };

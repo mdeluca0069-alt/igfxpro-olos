@@ -6,6 +6,7 @@ import {
   useState,
   ReactNode,
 } from "react";
+import { getClientEnv } from "../shared/config/clientEnv";
 
 type NetworkStatus =
   | "ONLINE"
@@ -40,7 +41,8 @@ export function NetworkGuard({ children }: Props) {
       const start = performance.now();
 
       try {
-        await fetch("/health", { method: "HEAD", cache: "no-store" });
+        const env = getClientEnv();
+        await fetch(`${env.API_BASE_URL}/health`, { method: "HEAD", cache: "no-store" });
 
         const end = performance.now();
 

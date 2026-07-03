@@ -2,8 +2,18 @@
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OLOS Terminal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#05070d" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Security headers are set via HTTP response headers (vite.config.ts / production reverse-proxy).
+         frame-ancestors and X-Frame-Options cannot be set via <meta> — they are HTTP-only directives. -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+
+    <title>OLOS Terminal — IGFXPRO</title>
+
+    <!-- Preconnect to backend for faster first request -->
+    <link rel="preconnect" href="http://localhost:3000" />
   </head>
   <body class="antialiased">
     <div id="root"></div>

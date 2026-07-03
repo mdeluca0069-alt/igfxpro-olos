@@ -1,9 +1,213 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html,
-body,
-#root {
+/* ═══ Design System Tokens ═══════════════════════════════════════════ */
+:root {
+  --void:       #000000;
+  --space:      #020408;
+  --deep:       #050c14;
+  --surface:    #0a1628;
+  --plasma:     #00d4ff;
+  --coherence:  #0080ff;
+  --signal:     #00ff9f;
+  --alert:      #ff4a4a;
+  --warn:       #ff9f00;
+
+  color-scheme: dark;
+  background: var(--void);
+  font-family: 'Space Grotesk', Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+html, body, #root {
   height: 100%;
 }
+
+body {
+  margin: 0;
+  background: var(--void);
+}
+
+* { box-sizing: border-box; }
+
+::selection { background: rgba(0, 212, 255, 0.22); }
+
+.font-display { font-family: 'Space Grotesk', sans-serif; }
+.font-data    { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+
+::-webkit-scrollbar          { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb    { border-radius: 999px; background: #0a1628; }
+::-webkit-scrollbar-track    { background: #000; }
+
+/* ═══ Ticker ═══════════════════════════════════════════════════════════ */
+@layer utilities {
+  .ticker-track { animation: ticker-scroll 60s linear infinite; }
+}
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ═══ Neural Manifold Ambient ════════════════════════════════════════ */
+@keyframes ambient-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%       { opacity: 0.7; transform: scale(1.08); }
+}
+@keyframes orbit {
+  0%   { transform: rotate(0deg)   translateX(120px) rotate(0deg); }
+  100% { transform: rotate(360deg) translateX(120px) rotate(-360deg); }
+}
+
+/* ═══ Scan button sweep ═════════════════════════════════════════════ */
+@keyframes scan-sweep {
+  0%   { left: -100%; }
+  100% { left: 110%; }
+}
+.btn-scan:hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  animation: scan-sweep 0.55s ease-out forwards;
+}
+.btn-scan { position: relative; overflow: hidden; }
+
+/* ═══ Glass Panel ════════════════════════════════════════════════════ */
+.glass-panel {
+  background: rgba(10, 22, 40, 0.82);
+  border: 1px solid rgba(255,255,255,0.06);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    0 0 0 1px rgba(0,212,255,0.04),
+    0 20px 60px rgba(0,0,0,0.6);
+}
+.glass-panel-glow {
+  background: rgba(10, 22, 40, 0.82);
+  border: 1px solid rgba(0,212,255,0.12);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 0 40px rgba(0,212,255,0.05),
+    0 20px 60px rgba(0,0,0,0.6);
+}
+
+/* ═══ Chronicle log lines ═══════════════════════════════════════════ */
+@keyframes log-appear {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.log-line { animation: log-appear 0.2s ease-out both; }
+
+/* ═══ Void pulse ════════════════════════════════════════════════════ */
+@keyframes void-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(0,212,255,0.6),  0 0 12px rgba(0,212,255,0.3); opacity: 0.7; }
+  50%       { box-shadow: 0 0 16px rgba(0,212,255,1.0), 0 0 40px rgba(0,212,255,0.5); opacity: 1;   }
+}
+.void-dot { animation: void-pulse 1.1s ease-in-out infinite; }
+
+/* ═══ Value update slide ════════════════════════════════════════════ */
+@keyframes value-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.value-update { animation: value-in 0.15s ease-out both; }
+
+/* ═══ Typewriter cursor ═════════════════════════════════════════════ */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.cursor-blink { animation: blink 1s step-end infinite; }
+
+/* ═══ Grid background ═══════════════════════════════════════════════ */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* ═══ Signal line animation ═════════════════════════════════════════ */
+@keyframes signal-draw {
+  from { stroke-dashoffset: 1000; }
+  to   { stroke-dashoffset: 0; }
+}
+.signal-path { animation: signal-draw 1.8s ease-out forwards; }
+
+/* ═══ Scanline effect ═══════════════════════════════════════════════ */
+@keyframes scanline {
+  0%   { top: -2px; }
+  100% { top: 100%; }
+}
+.scanline::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,212,255,0.3), transparent);
+  animation: scanline 3s linear infinite;
+}
+.scanline { position: relative; overflow: hidden; }
+
+/* ═══ Number jitter ═════════════════════════════════════════════════ */
+@keyframes jitter {
+  0%,100% { transform: none; }
+  25%     { transform: translateX(-1px); }
+  75%     { transform: translateX(1px); }
+}
+.jitter-active { animation: jitter 0.1s steps(2) infinite; }
+
+/* ═══ Manifold glow ambient ═════════════════════════════════════════ */
+@keyframes manifold-glow {
+  0%,100% { opacity: 0.15; }
+  50%     { opacity: 0.28; }
+}
+
+/* ═══ Regime Pulse bar ══════════════════════════════════════════════ */
+.regime-bar {
+  background: rgba(0,0,0,0.92);
+  border-top: 1px solid rgba(0,212,255,0.1);
+  backdrop-filter: blur(20px);
+}
+
+/* ═══ Opening section ═══════════════════════════════════════════════ */
+@keyframes question-appear {
+  from { opacity: 0; letter-spacing: 0.5em; }
+  to   { opacity: 1; letter-spacing: -0.02em; }
+}
+.question-text { animation: question-appear 1.2s cubic-bezier(0.76,0,0.24,1) both; }
+
+/* ═══ Custom OLOS cursor ════════════════════════════════════════════ */
+.olos-ui, .olos-ui * { cursor: none !important; }
+
+/* ═══ Holographic card tilt ═════════════════════════════════════════ */
+.holo-card { transform-style: preserve-3d; }
+
+/* ═══ Pipeline connector flow ═══════════════════════════════════════ */
+@keyframes pipe-flow {
+  from { background-position: 0% 50%; }
+  to   { background-position: 200% 50%; }
+}
+.pipe-line {
+  background: linear-gradient(90deg, rgba(0,212,255,0.4) 0%, rgba(0,255,159,0.8) 50%, rgba(0,212,255,0.4) 100%);
+  background-size: 200% 100%;
+  animation: pipe-flow 2.2s linear infinite;
+}
+
+/* ═══ EKG heartbeat glow ════════════════════════════════════════════ */
+@keyframes ekg-glow {
+  0%,100% { opacity: 0.6; }
+  50%     { opacity: 1;   }
+}
+.ekg-lead { animation: ekg-glow 0.9s ease-in-out infinite; }
+
+/* ═══ Comparison scan ═══════════════════════════════════════════════ */
+@keyframes row-scan {
+  from { background: rgba(0,212,255,0.06); }
+  to   { background: transparent; }
+}
+.row-scanned { animation: row-scan 0.5s ease-out both; }
+
+/* ═══ Magnetic button reset spring ══════════════════════════════════ */
+.mag-btn { transition: box-shadow 0.2s; }
+.mag-btn:hover { box-shadow: 0 0 40px rgba(0,212,255,0.3); }

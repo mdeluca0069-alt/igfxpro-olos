@@ -6,16 +6,18 @@ export const FeatureFlagsSchema = z.object({
   brokerControlCenter: z.boolean(),
   hedgeAutomation: z.boolean(),
   institutionalCharts: z.boolean(),
+  liveTrading: z.boolean(),
 });
 
 export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 
 export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
-  aiTrading: false,
-  smartSignals: false,
-  brokerControlCenter: false,
-  hedgeAutomation: false,
-  institutionalCharts: false,
+  aiTrading: true,
+  smartSignals: true,
+  brokerControlCenter: true,
+  hedgeAutomation: true,
+  institutionalCharts: true,
+  liveTrading: true,   // default LIVE — changed to false only by explicit admin flag
 };
 
 export function parseFeatureFlagsPayload(raw: unknown): FeatureFlags {

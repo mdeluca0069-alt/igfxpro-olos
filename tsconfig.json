@@ -27,6 +27,14 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "api/**/*.ts",
-    "streams/**/*.ts"
+    "streams/**/*.ts",
+    "components/**/*.tsx",
+    "pages/**/*.tsx",
+    "routes/**/*.tsx",
+    "hooks/**/*.ts",
+    "store/**/*.ts",
+    "core/**/*.ts",
+    "utils/**/*.ts",
+    "App.tsx"
   ]
 }

@@ -34,7 +34,7 @@ function readDevPrincipalJson(raw: string | undefined): Principal {
       roles: ["admin"],
       permissions: ["trade.execute", "admin.access", "signals.view"],
       tier: "ENTERPRISE",
-      email: "dev@localhost",
+      email: "dev@igfxpro.local",
       displayName: "Development operator",
     });
   }
@@ -60,12 +60,12 @@ async function fetchSessionPrincipal(
 
 async function exchangeRefreshToken(): Promise<string | null> {
   const env = getClientEnv();
-  const refresh = tokenVault.getRefreshToken();
-  if (!refresh) return null;
   try {
-    const res = await getAuthHttp().post(env.AUTH_REFRESH_PATH, {
-      refreshToken: refresh,
-    });
+    // Send empty body — browser automatically includes the igfxpro_rt httpOnly
+    // cookie because getAuthHttp() has withCredentials: true. The backend reads
+    // the cookie first, then falls back to the request body.
+    const res = await getAuthHttp().post(env.AUTH_REFRESH_PATH, {});
+    if (!res.data?.ok) return null;
     const tokens = parseTokenBundle(res.data);
     tokenVault.setAccessToken(tokens.accessToken);
     if (tokens.refreshToken) {
@@ -81,6 +81,7 @@ async function exchangeRefreshToken(): Promise<string | null> {
   }
 }
 
+
 /**
  * Establishes an authenticated principal for the terminal shell.
  * Dev bypass is gated strictly to Vite development + explicit env flag.
@@ -89,6 +90,8 @@ export async function bootstrapAuth(): Promise<AuthBootstrapResult> {
   try {
     const env = getClientEnv();
 
+    // DEV bypass: explicit opt-in only via AUTH_DEV_BYPASS=true env flag.
+    // This must NEVER be set in production builds.
     if (import.meta.env.DEV && env.AUTH_DEV_BYPASS) {
       const principal = readDevPrincipalJson(env.AUTH_DEV_PRINCIPAL_JSON);
       const accessToken = `__olos_dev__${crypto.randomUUID?.() ?? Date.now()}`;
@@ -98,20 +101,25 @@ export async function bootstrapAuth(): Promise<AuthBootstrapResult> {
       return { ok: true, principal, accessToken };
     }
 
+    // 1. Check in-memory access token from a previous call in this session
     let access = tokenVault.getAccessToken();
 
+    // 2. Try silent refresh via httpOnly cookie (works after page reload)
     if (!access) {
       access = await exchangeRefreshToken();
     }
 
+    // 3. No valid session — user must log in explicitly
     if (!access) {
       writeStoredPrincipal(null);
       return { ok: false, reason: "unauthenticated" };
     }
 
+    // 4. Validate the access token against the backend
     let principal = await fetchSessionPrincipal(access);
 
-    if (!principal && tokenVault.getRefreshToken()) {
+    // 5. If token expired, try one more refresh via httpOnly cookie
+    if (!principal) {
       const next = await exchangeRefreshToken();
       if (next) {
         access = next;

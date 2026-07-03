@@ -3,55 +3,85 @@ import { z } from "zod";
 export const OrderSideSchema = z.enum(["BUY", "SELL"]);
 export type OrderSide = z.infer<typeof OrderSideSchema>;
 
-export const TimeInForceSchema = z.enum([
-  "DAY",
-  "GTC",
-  "IOC",
-  "FOK",
-  "GTD",
-]);
-export type TimeInForce = z.infer<typeof TimeInForceSchema>;
-
-export const OrderTypeSchema = z.enum([
-  "MARKET",
-  "LIMIT",
-  "STOP",
-  "STOP_LIMIT",
-]);
+export const OrderTypeSchema = z.enum(["MARKET", "LIMIT", "STOP", "OCO"]);
 export type OrderType = z.infer<typeof OrderTypeSchema>;
 
 export const InstrumentRefSchema = z.object({
   symbol: z.string().min(1),
-  venue: z.string().min(1).optional(),
-  assetClass: z.enum(["EQUITY", "FX", "CRYPTO", "FUTURES", "OPTION"]).optional(),
+  name: z.string().optional(),
+  assetClass: z.string().optional(),
 });
 export type InstrumentRef = z.infer<typeof InstrumentRefSchema>;
 
 export const NewOrderRequestSchema = z.object({
-  clientOrderId: z.string().min(8).max(64),
-  instrument: InstrumentRefSchema,
+  symbol: z.string().min(3),
   side: OrderSideSchema,
-  type: OrderTypeSchema,
+  type: OrderTypeSchema.default("MARKET"),
   quantity: z.number().positive(),
-  limitPrice: z.number().positive().optional(),
-  stopPrice: z.number().positive().optional(),
-  timeInForce: TimeInForceSchema.default("DAY"),
-  tags: z.array(z.string()).max(16).optional(),
+  price: z.number().positive().optional(),
+  stopLoss: z.number().positive().optional(),
+  takeProfit: z.number().positive().optional(),
+  leverage: z.number().positive().max(500).default(1),
+  clientOrderId: z.string().min(3).max(80).optional(),
 });
 export type NewOrderRequest = z.infer<typeof NewOrderRequestSchema>;
 
 export const OrderAckSchema = z.object({
-  orderId: z.string().min(1),
-  clientOrderId: z.string().min(1),
-  status: z.enum(["ACCEPTED", "REJECTED", "PENDING"]),
-  reason: z.string().optional(),
+  id: z.string().min(1),
+  clientOrderId: z.string().optional(),
+  symbol: z.string().min(1),
+  side: OrderSideSchema,
+  type: OrderTypeSchema,
+  quantity: z.number(),
+  requestedPrice: z.number().optional(),
+  averageFillPrice: z.number().optional(),
+  status: z.enum([
+    "RECEIVED",
+    "RISK_REVIEW",
+    "ACCEPTED",
+    "PARTIALLY_FILLED",
+    "FILLED",
+    "REJECTED",
+    "CANCELLED",
+  ]),
+  rejectionReason: z.string().optional(),
+  marginRequired: z.number(),
+  notional: z.number(),
+  createdAt: z.string(),
 });
 export type OrderAck = z.infer<typeof OrderAckSchema>;
 
 export const PositionRowSchema = z.object({
-  instrument: InstrumentRefSchema,
-  quantity: z.number(),
-  avgPrice: z.number(),
-  unrealizedPnl: z.number().optional(),
+  id: z.string(),
+  symbol: z.string(),
+  side: OrderSideSchema,
+  quantity:   z.coerce.number(),
+  entryPrice: z.coerce.number(),
+  markPrice:  z.coerce.number(),
+  pnl:        z.coerce.number(),
+  marginUsed: z.coerce.number(),
+  leverage:   z.coerce.number(),
+  openedAt: z.string(),
 });
 export type PositionRow = z.infer<typeof PositionRowSchema>;
+
+export const LiquidityLevelSchema = z.object({
+  price: z.number(),
+  volume: z.number(),
+  cumulativeVolume: z.number(),
+});
+export type LiquidityLevel = z.infer<typeof LiquidityLevelSchema>;
+
+export const LiquidityBookSchema = z.object({
+  symbol: z.string(),
+  provider: z.literal("IGFX_INTERNAL_LP"),
+  mode: z.enum(["sandbox", "live", "internal"]),
+  bid: z.number(),
+  ask: z.number(),
+  spread: z.number(),
+  spreadBps: z.number(),
+  bids: z.array(LiquidityLevelSchema),
+  asks: z.array(LiquidityLevelSchema),
+  generatedAt: z.string(),
+});
+export type LiquidityBook = z.infer<typeof LiquidityBookSchema>;

@@ -23,13 +23,11 @@ async function refreshAccessToken(): Promise<string | null> {
 
   refreshInFlight = (async () => {
     const env = getClientEnv();
-    const refresh = tokenVault.getRefreshToken();
-    if (!refresh) return null;
-
     try {
-      const res = await getAuthHttp().post(env.AUTH_REFRESH_PATH, {
-        refreshToken: refresh,
-      });
+      // Send empty body — browser automatically includes the igfxpro_rt httpOnly
+      // cookie because getAuthHttp() has withCredentials: true.
+      const res = await getAuthHttp().post(env.AUTH_REFRESH_PATH, {});
+      if (!res.data?.ok) return null;
 
       const tokens = parseTokenBundle(res.data);
       tokenVault.setAccessToken(tokens.accessToken);

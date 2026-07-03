@@ -22,6 +22,7 @@ export const PrincipalSchema = z.object({
   permissions: z.array(z.string()).default([]),
   tier: ACCOUNT_TIER_SCHEMA.default("STANDARD"),
   displayName: z.string().optional(),
+  accountNumber: z.string().optional(),
 });
 
 export type Principal = z.infer<typeof PrincipalSchema>;
@@ -92,7 +93,8 @@ function normalizePrincipalShape(input: unknown): unknown {
     roles,
     permissions,
     tier: r.tier,
-    displayName: r.displayName ?? r.name ?? r.display_name,
+    displayName: r.displayName ?? r.name ?? r.display_name ?? r.fullName ?? r.full_name,
+    accountNumber: r.accountNumber ?? r.account_number,
   };
 }
 

@@ -1,89 +1,81 @@
-const NS = "olos.terminal.v1.";
-
-const LEGACY_ACCESS = "access_token";
-const LEGACY_TENANT = "tenant_id";
-
-let migrated = false;
-
-function migrateLegacyOnce(): void {
-  if (migrated) return;
-  migrated = true;
-
-  try {
-    const legacyAccess = localStorage.getItem(LEGACY_ACCESS);
-    if (legacyAccess && !localStorage.getItem(`${NS}accessToken`)) {
-      localStorage.setItem(`${NS}accessToken`, legacyAccess);
-    }
-    const legacyTenant = localStorage.getItem(LEGACY_TENANT);
-    if (legacyTenant && !localStorage.getItem(`${NS}tenantId`)) {
-      localStorage.setItem(`${NS}tenantId`, legacyTenant);
-    }
-  } catch {
-    /* storage may be unavailable in private mode */
-  }
-}
-
-function read(key: string): string | null {
-  migrateLegacyOnce();
-  try {
-    return localStorage.getItem(`${NS}${key}`);
-  } catch {
-    return null;
-  }
-}
-
-function write(key: string, value: string | null): void {
-  migrateLegacyOnce();
-  try {
-    if (value === null) localStorage.removeItem(`${NS}${key}`);
-    else localStorage.setItem(`${NS}${key}`, value);
-  } catch {
-    /* ignore quota / privacy errors */
-  }
-}
-
 /**
- * Namespaced credential + tenant storage. Keeps keys consistent across modules.
+ * Token storage abstraction.
+ *
+ * Security posture:
+ * - Access tokens: stored in memory only (lost on page refresh — refreshed via httpOnly cookie).
+ *   Never stored in localStorage or sessionStorage.
+ * - Refresh tokens: stored as httpOnly cookies by the server. The browser sends them
+ *   automatically; JavaScript cannot read them.
+ * - Tenant ID: non-sensitive, stored in sessionStorage for cross-tab resilience.
+ *
+ * Migration from v1 (localStorage):
+ * - On first access, any legacy localStorage token is erased and session is cleared.
+ *   This forces a re-login via the refresh-cookie flow.
  */
+
+const TENANT_KEY = "olos.tenantId.v2";
+
+// In-memory access token — cleared on page navigation, refreshed via cookie
+let _accessToken: string | null = null;
+
+function eraseLegacyStorage(): void {
+  try {
+    const legacyKeys = [
+      "olos.terminal.v1.accessToken",
+      "olos.terminal.v1.refreshToken",
+      "access_token",
+      "tenant_id",
+      "igfxpro_client_token",
+      "igfxpro_admin_token",
+    ];
+    legacyKeys.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* storage may be unavailable */
+  }
+}
+
+// Erase legacy on module load — one-time migration
+eraseLegacyStorage();
+
 export const tokenVault = {
+  // ─── Access token (in-memory only) ──────────────────────────────────────────
   getAccessToken(): string | null {
-    return read("accessToken");
+    return _accessToken;
   },
 
   setAccessToken(token: string | null): void {
-    write("accessToken", token);
-    try {
-      if (token === null) localStorage.removeItem(LEGACY_ACCESS);
-      else localStorage.setItem(LEGACY_ACCESS, token);
-    } catch {
-      /* best-effort legacy mirror */
-    }
+    _accessToken = token;
+    // Explicit: never write to localStorage
   },
 
-  getRefreshToken(): string | null {
-    return read("refreshToken");
-  },
+  // ─── Refresh token (httpOnly cookie — server-managed) ───────────────────────
+  // JavaScript cannot read httpOnly cookies.
+  // The browser sends them automatically with credentials: "include".
+  // These methods are no-ops kept for API compatibility.
+  getRefreshToken(): string | null   { return null; /* httpOnly cookie */ },
+  setRefreshToken(_token: string | null): void { /* server-managed */ },
 
-  setRefreshToken(token: string | null): void {
-    write("refreshToken", token);
-  },
-
+  // ─── Tenant ID (sessionStorage — not sensitive) ─────────────────────────────
   getTenantId(): string | null {
-    return read("tenantId");
+    try { return sessionStorage.getItem(TENANT_KEY); } catch { return null; }
   },
 
   setTenantId(tenantId: string | null): void {
-    write("tenantId", tenantId);
     try {
-      if (tenantId === null) localStorage.removeItem(LEGACY_TENANT);
-      else localStorage.setItem(LEGACY_TENANT, tenantId);
-    } catch {
-      /* ignore */
-    }
+      if (tenantId === null) sessionStorage.removeItem(TENANT_KEY);
+      else sessionStorage.setItem(TENANT_KEY, tenantId);
+    } catch { /* ignore */ }
   },
 
+  // ─── Session management ──────────────────────────────────────────────────────
   clearSession(): void {
-    this.setAccessToken(null);
-    this.setRefreshToken(null);
+    _accessToken = null;
+    try { sessionStorage.removeItem(TENANT_KEY); } catch { /* ignore */ }
+    // The server must clear the httpOnly refresh-token cookie on logout.
+    // Frontend cannot delete httpOnly cookies directly.
+  },
+
+  isAuthenticated(): boolean {
+    return _accessToken !== null;
   },
 };

@@ -69,16 +69,6 @@ export const FeatureFlagProvider: React.FC<
     void initializeFlags();
   }, []);
 
-  if (loading && !flags) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-black text-white">
-        <div className="text-sm tracking-wide text-slate-400">
-          Caricamento capability map…
-        </div>
-      </div>
-    );
-  }
-
   return (
     <FeatureFlagContext.Provider value={contextValue}>
       {children}
