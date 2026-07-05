@@ -10,6 +10,7 @@ import {
 } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useMarketStore } from "../../store/market.store";
+import { getClientEnv } from "../../shared/config/clientEnv";
 import {
   ArrowRight, BarChart2, Brain, Shield, Lock, Eye, Activity, Zap,
   Globe, Database, Cpu, PieChart, Menu, X, Calendar, GraduationCap,
@@ -33,11 +34,23 @@ type RawCalEvent      = { eventTime: string; currency: string; title: string; im
 // ══════════════════════════════════════════════════════════════════════
 // DATA HOOKS
 // ══════════════════════════════════════════════════════════════════════
+// A relative fetch("/api/...") resolves against the current page's own
+// origin. That's fine in dev (Vite proxies it to the backend) but this page
+// is served from a Cloudflare Workers static-assets host with no such
+// proxy — every relative call here fell through to the SPA's index.html
+// fallback (200 OK, but HTML, not JSON), so every "live" widget on this
+// public homepage silently failed and showed its empty state. apiUrl()
+// prefixes the same absolute backend URL the rest of the app already uses
+// (VITE_API_URL / API_BASE_URL) so anonymous visitors actually get real data.
+function apiUrl(path: string): string {
+  return getClientEnv().API_BASE_URL + path;
+}
+
 function useQuotes() {
   return useQuery<Quote[]>({
     queryKey: ["hp-quotes"],
     queryFn:  async () => {
-      const r = await fetch("/api/v1/trading/quotes");
+      const r = await fetch(apiUrl("/api/v1/trading/quotes"));
       if (!r.ok) return [];
       const raw = await r.json() as Array<{ symbol: string; bid?: number; ask?: number; mid?: number; changePct?: number; changePercent?: number }>;
       return raw.map(q => {
@@ -51,7 +64,7 @@ function useQuotes() {
 function useAIConf() {
   return useQuery<AIConf | null>({
     queryKey: ["hp-conf"],
-    queryFn:  async () => { try { const r = await fetch("/api/v1/ai/confidence"); return r.ok ? r.json() : null; } catch { return null; } },
+    queryFn:  async () => { try { const r = await fetch(apiUrl("/api/v1/ai/confidence")); return r.ok ? r.json() : null; } catch { return null; } },
     refetchInterval: 8000, retry: false,
   });
 }
@@ -63,7 +76,7 @@ function useSigStats() {
     queryKey: ["hp-stats"],
     queryFn:  async () => {
       try {
-        const r = await fetch("/api/v1/ai/confidence");
+        const r = await fetch(apiUrl("/api/v1/ai/confidence"));
         if (!r.ok) return null;
         const conf = await r.json() as { score: number | null; signalCount?: number };
         if (conf.score === null) return { totalSignals: 0, activeSignals: 0, avgConfidence: 0, successRate: 0 };
@@ -82,21 +95,21 @@ function useSigStats() {
 function usePlatformStats() {
   return useQuery<PlatformStats | null>({
     queryKey: ["hp-platform-stats"],
-    queryFn:  async () => { try { const r = await fetch("/api/v1/platform/stats"); return r.ok ? r.json() : null; } catch { return null; } },
+    queryFn:  async () => { try { const r = await fetch(apiUrl("/api/v1/platform/stats")); return r.ok ? r.json() : null; } catch { return null; } },
     refetchInterval: 15000, staleTime: 10000, retry: false,
   });
 }
 function useTelemetry() {
   return useQuery<TelemetryData | null>({
     queryKey: ["hp-telemetry"],
-    queryFn:  async () => { try { const r = await fetch("/api/v1/telemetry/health"); return r.ok ? r.json() : null; } catch { return null; } },
+    queryFn:  async () => { try { const r = await fetch(apiUrl("/api/v1/telemetry/health")); return r.ok ? r.json() : null; } catch { return null; } },
     refetchInterval: 30000, staleTime: 20000, retry: false,
   });
 }
 function useInstruments() {
   return useQuery<PublicInstrument[]>({
     queryKey: ["hp-instruments"],
-    queryFn:  async () => { try { const r = await fetch("/api/v1/trading/instruments"); return r.ok ? r.json() : []; } catch { return []; } },
+    queryFn:  async () => { try { const r = await fetch(apiUrl("/api/v1/trading/instruments")); return r.ok ? r.json() : []; } catch { return []; } },
     staleTime: 300000, retry: false,
   });
 }
@@ -108,7 +121,7 @@ function useActiveSignals() {
     queryKey: ["hp-signals"],
     queryFn:  async () => {
       try {
-        const r = await fetch("/api/v1/ai/signals");
+        const r = await fetch(apiUrl("/api/v1/ai/signals"));
         if (!r.ok) return [];
         const raw = await r.json() as Array<{ id: string; symbol: string; signalType: string; confidence: number; timeframe: string }>;
         return raw.map(s => ({ id: s.id, symbol: s.symbol, signalType: s.signalType as ActiveSignal["signalType"], confidence: Math.round(s.confidence), timeframe: s.timeframe }));
@@ -125,7 +138,7 @@ function usePublicCalendar() {
     queryKey: ["hp-calendar"],
     queryFn:  async () => {
       try {
-        const r = await fetch("/api/v1/calendar/economic?hours=48");
+        const r = await fetch(apiUrl("/api/v1/calendar/economic?hours=48"));
         if (!r.ok) return [];
         const raw = await r.json() as RawCalEvent[];
         return raw.map((ev) => ({
@@ -144,14 +157,14 @@ function useExecStats() {
   // Order.createdAt→filledAt (no auth, unlike /execution/stats which is per-user).
   return useQuery<{ avgExecutionMs: number; fillRate: number; avgSlippagePips: number; settlementSuccessRate: number } | null>({
     queryKey: ["hp-exec"],
-    queryFn:  async () => { try { const r = await fetch("/api/v1/execution/stats/public"); return r.ok ? r.json() : null; } catch { return null; } },
+    queryFn:  async () => { try { const r = await fetch(apiUrl("/api/v1/execution/stats/public")); return r.ok ? r.json() : null; } catch { return null; } },
     refetchInterval: 60000, staleTime: 45000, retry: false,
   });
 }
 function useRegime() {
   return useQuery<{ regime: string | null; adx: number | null; adxSlope: number | null; trending: boolean; volatilityLevel: string | null; status: "ACTIVE" | "INSUFFICIENT_DATA" } | null>({
     queryKey: ["hp-regime"],
-    queryFn:  async () => { try { const r = await fetch("/api/v1/ai/regime?symbol=EURUSD&timeframe=1H"); return r.ok ? r.json() : null; } catch { return null; } },
+    queryFn:  async () => { try { const r = await fetch(apiUrl("/api/v1/ai/regime?symbol=EURUSD&timeframe=1H")); return r.ok ? r.json() : null; } catch { return null; } },
     refetchInterval: 15000, staleTime: 10000, retry: false,
   });
 }
@@ -163,7 +176,7 @@ function useAutopilotStats() {
   // (signals actually executed). No fabricated "Bot 01" demo data.
   return useQuery<AutopilotStats | null>({
     queryKey: ["hp-autopilot"],
-    queryFn:  async () => { try { const r = await fetch("/api/v1/autopilot/stats/public"); return r.ok ? r.json() : null; } catch { return null; } },
+    queryFn:  async () => { try { const r = await fetch(apiUrl("/api/v1/autopilot/stats/public")); return r.ok ? r.json() : null; } catch { return null; } },
     refetchInterval: 20000, staleTime: 15000, retry: false,
   });
 }
@@ -173,7 +186,7 @@ function useDecisionLog() {
   // not a scripted/hardcoded replay.
   return useQuery<DecisionLog | null>({
     queryKey: ["hp-decision-log"],
-    queryFn:  async () => { try { const r = await fetch("/api/v1/ai/decision-log"); return r.ok ? r.json() : null; } catch { return null; } },
+    queryFn:  async () => { try { const r = await fetch(apiUrl("/api/v1/ai/decision-log")); return r.ok ? r.json() : null; } catch { return null; } },
     refetchInterval: 30000, staleTime: 20000, retry: false,
   });
 }
@@ -864,7 +877,7 @@ function RegimePulse() {
                 const pq   = quotes.find(q => q.symbol === sym);
                 const rawM = sq?.mid ?? pq?.mid;
                 const mid  = (rawM && rawM > 0) ? rawM : null;
-                const chg  = sq?.changePercent ?? pq?.changePercent ?? 0;
+                const chg  = sq?.changePct ?? pq?.changePercent ?? 0;
                 const rg   = regime(chg);
                 const dec2 = sym.includes("JPY") || sym.includes("US") ? 2 : 5;
                 return (
@@ -1933,7 +1946,7 @@ function TheLiveRoom() {
                 const pq  = quotes.find(q => q.symbol === sym);
                 const rawMid = sq?.mid ?? pq?.mid;
                 const mid = (rawMid && rawMid > 0) ? rawMid : null;
-                const chg = sq?.changePercent ?? pq?.changePercent ?? 0;
+                const chg = sq?.changePct ?? pq?.changePercent ?? 0;
                 const rg  = regime(chg);
                 const dec = sym.includes("JPY") || sym.includes("US") ? 2 : 5;
                 return (
