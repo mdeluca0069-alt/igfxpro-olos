@@ -42,7 +42,9 @@ type IndicatorSnapshot = {
 type AutopilotConfig = {
   enabled: boolean; mode: string; minConfidence: number; tier: string;
   allowedSymbols: string[];
-  lastDecision: { symbol: string; action: string; reason: string };
+  // Absent until the autopilot engine actually makes a decision for this
+  // user — true for every account today, not an error state.
+  lastDecision?: { symbol: string; action: string; reason: string };
 };
 // Real shape from GET /api/v1/calendar/economic (lowercase impact, eventTime
 // ISO, title not event) — countdown is derived client-side, never fabricated.
@@ -334,7 +336,7 @@ function AutopilotPanel({ ap }: { ap: AutopilotConfig | undefined }) {
 
         <div className="mb-4 rounded-xl border border-violet-500/15 bg-violet-500/[0.04] p-3">
           <p className="mb-1.5 text-[9px] font-black uppercase tracking-wider text-slate-600">Last AI decision</p>
-          <p className="text-[10px] leading-relaxed text-slate-400">{ap.lastDecision.reason}</p>
+          <p className="text-[10px] leading-relaxed text-slate-400">{ap.lastDecision?.reason ?? "No decisions yet — Autopilot hasn't acted on your account."}</p>
         </div>
 
         <p className="mb-2 text-[9px] font-black uppercase tracking-wider text-slate-600">AI engines</p>
