@@ -849,7 +849,8 @@ function NeuralHero({ ready }: { ready: boolean }) {
 // ══════════════════════════════════════════════════════════════════════
 // REGIME PULSE — sticky bottom bar
 // ══════════════════════════════════════════════════════════════════════
-const PULSE_ASSETS = ["EURUSD","GBPUSD","USDJPY","XAUUSD","US500","US100","BTCUSD","ETHUSD"];
+// US500/US100 dropped — see LIVE_ASSETS below for why (no free-tier index data).
+const PULSE_ASSETS = ["EURUSD","GBPUSD","USDJPY","XAUUSD","XAGUSD","SOLUSD","BTCUSD","ETHUSD"];
 
 function RegimePulse() {
   const [vis, setVis] = useState(false);
@@ -1904,10 +1905,15 @@ function TerminalPreview() {
 // ══════════════════════════════════════════════════════════════════════
 // 7 — THE LIVE ROOM
 // ══════════════════════════════════════════════════════════════════════
+// US500/US100 dropped: TwelveData's free tier doesn't include index data
+// (confirmed via direct API test — "available starting with the Pro or
+// Venture plan") and neither does Finnhub's calendar-adjacent free tier via
+// OANDA passthrough. Swapped for two instruments this platform actually has
+// live prices for, rather than showing a permanently-empty tile.
 const LIVE_ASSETS = [
   { sym:"EURUSD", label:"EUR/USD" }, { sym:"GBPUSD", label:"GBP/USD" },
   { sym:"USDJPY", label:"USD/JPY" }, { sym:"XAUUSD", label:"XAU/USD" },
-  { sym:"US500",  label:"S&P 500"  }, { sym:"US100",  label:"NASDAQ"   },
+  { sym:"XAGUSD", label:"XAG/USD" }, { sym:"SOLUSD", label:"SOL/USD" },
   { sym:"BTCUSD", label:"BTC/USD" }, { sym:"ETHUSD", label:"ETH/USD" },
 ];
 
