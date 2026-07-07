@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, YAxis, Tooltip, CartesianGrid, XAxis } from "recharts";
 import { useQuery } from "@tanstack/react-query";
-import { tokenVault } from "../../shared/lib/tokenVault";
+import { apiPost } from "../../shared/lib/apiHelpers";
 
 const SYMBOLS    = ["EURUSD", "XAUUSD", "US500", "BTCUSD", "GBPUSD", "USDJPY", "GBPJPY", "USDCHF", "ETHUSD", "US100"];
 const TIMEFRAMES = ["1M", "5M", "15M", "1H", "4H", "1D"];
@@ -57,17 +57,7 @@ async function runBacktest(params: {
   symbol: string; timeframe: string; strategy: string;
   dateFrom: string; dateTo: string; initialCapital: number;
 }): Promise<BacktestResult> {
-  const token = tokenVault.getAccessToken();
-  const res = await fetch("/api/v1/ai/backtest", {
-    method:  "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": token ? `Bearer ${token}` : "",
-    },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) throw new Error(`Backtest failed: ${res.status}`);
-  return res.json();
+  return apiPost<BacktestResult>("/api/v1/ai/backtest", params);
 }
 
 // ─── Metric card ──────────────────────────────────────────────────────────────

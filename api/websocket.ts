@@ -145,7 +145,7 @@ class WebSocketManager {
       if (ev.code === 4001) {
         log.warn("ws rejected with 4001 — attempting silent token refresh");
         this.emitLocal("ws.reconnecting", { attempt: this.attempt, delayMs: 0 });
-        fetch("/api/v1/auth/refresh/db", { method: "POST", credentials: "include" })
+        fetch(`${getClientEnv().API_BASE_URL}/api/v1/auth/refresh/db`, { method: "POST", credentials: "include" })
           .then((r) => r.json())
           .then((data: unknown) => {
             const d = data as Record<string, unknown>;

@@ -74,6 +74,7 @@ type TradingState = {
   lastOrderAt:   string | null;
   submitting:    boolean;
   loading:       boolean;
+  ordersError:   string | null;
 
   // Setters
   setOrders:           (orders: Order[]) => void;
@@ -114,6 +115,7 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   lastOrderAt:   null,
   submitting:    false,
   loading:       false,
+  ordersError:   null,
 
   setOrders:       (orders)   => set({ orders }),
   setPositions:    (positions) => set({ positions }),
@@ -183,8 +185,10 @@ export const useTradingStore = create<TradingState>((set, get) => ({
     try {
       const res = await getApiClient().get<Order[]>("/api/v1/trading/history");
       const data = Array.isArray(res.data) ? res.data : [];
-      set({ orders: data });
-    } catch { /* non-fatal */ }
+      set({ orders: data, ordersError: null });
+    } catch (err) {
+      set({ ordersError: err instanceof Error ? err.message : "Failed to fetch orders" });
+    }
   },
 
   fetchPending: async () => {

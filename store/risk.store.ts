@@ -37,6 +37,7 @@ type RiskState = {
   killSwitchActive:    boolean;
   liveTradeDisabled:   boolean;
   loading:             boolean;
+  error:               string | null;
 
   // Setters
   setSnapshot:          (snapshot: RiskSnapshot) => void;
@@ -67,6 +68,7 @@ export const useRiskStore = create<RiskState>((set, get) => ({
   killSwitchActive:    false,
   liveTradeDisabled:   false,
   loading:             false,
+  error:               null,
 
   setSnapshot: (snapshot) =>
     set({
@@ -112,8 +114,14 @@ export const useRiskStore = create<RiskState>((set, get) => ({
     try {
       const res = await getApiClient().get<RiskSnapshot>("/api/v1/risk/snapshot");
       if (res.data) get().setSnapshot(res.data);
-    } catch {
-      // Non-fatal
+      set({ error: null });
+    } catch (err) {
+      // Previously fully swallowed with no retry, so a single transient
+      // failure left Risk Monitor permanently "ERR" with no way to recover
+      // short of a full page reload. Now tracked so callers (OLOS Brain) can
+      // distinguish "never loaded yet" from "actually failing", and so a
+      // future tick's success clears it automatically.
+      set({ error: err instanceof Error ? err.message : "Failed to fetch risk snapshot" });
     } finally {
       set({ loading: false });
     }

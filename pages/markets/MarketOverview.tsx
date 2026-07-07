@@ -11,6 +11,7 @@ import {
   DollarSign, Cpu, Shield, Zap, ChevronRight,
 } from "lucide-react";
 import { usePageTitle } from "../../hooks/usePageTitle";
+import { apiGet } from "../../shared/lib/apiHelpers";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 const fadeUp = {
@@ -67,7 +68,7 @@ const ASSET_CLASSES = [
 function MiniQuote({ symbol, digits }: { symbol: string; digits: number }) {
   const { data: quotes } = useQuery<Quote[]>({
     queryKey: ["pub-quotes-market"],
-    queryFn: async () => { const r = await fetch("/api/v1/trading/quotes"); return r.ok ? r.json() : []; },
+    queryFn: async () => { try { return await apiGet<Quote[]>("/api/v1/trading/quotes"); } catch { return []; } },
     refetchInterval: 3_000,
     staleTime: 2_000,
   });

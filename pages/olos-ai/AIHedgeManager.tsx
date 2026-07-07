@@ -12,7 +12,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTradingStore } from "../../store/trading.store";
 import { usePortfolioStore } from "../../store/portfolio.store";
-import { tokenVault } from "../../shared/lib/tokenVault";
+import { apiPost } from "../../shared/lib/apiHelpers";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type HedgeSuggestion = {
@@ -40,34 +40,14 @@ type HedgeResponse = {
 };
 
 async function fetchHedgeAnalysis(positions: { id: string; symbol: string; side: string; quantity: number; pnl: number }[]): Promise<HedgeResponse> {
-  const token = tokenVault.getAccessToken();
-  const res = await fetch("/api/v1/ai/hedge", {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": token ? `Bearer ${token}` : "",
-    },
-    body: JSON.stringify({ positions }),
-  });
-  if (!res.ok) throw new Error(`Hedge API error: ${res.status}`);
-  return res.json();
+  return apiPost<HedgeResponse>("/api/v1/ai/hedge", { positions });
 }
 
 async function placeHedgeOrder(symbol: string, side: "BUY" | "SELL", quantity: number): Promise<{ status: string }> {
-  const token = tokenVault.getAccessToken();
-  const res = await fetch("/api/v1/trading/order", {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": token ? `Bearer ${token}` : "",
-    },
-    body: JSON.stringify({
-      symbol, side, type: "MARKET", quantity, leverage: 1,
-      clientOrderId: `hedge_${Date.now()}`,
-    }),
+  return apiPost<{ status: string }>("/api/v1/trading/order", {
+    symbol, side, type: "MARKET", quantity, leverage: 1,
+    clientOrderId: `hedge_${Date.now()}`,
   });
-  if (!res.ok) throw new Error("Order failed");
-  return res.json();
 }
 
 // ─── Correlation bar ──────────────────────────────────────────────────────────
@@ -160,12 +140,13 @@ export default function AIHedgeManager() {
     side: p.side, quantity: p.quantity, pnl: p.pnl ?? 0,
   }));
 
-  const { data: hedge, isLoading, refetch } = useQuery<HedgeResponse>({
+  const { data: hedge, isLoading, isError, error: hedgeQueryError, refetch } = useQuery<HedgeResponse>({
     queryKey: ["hedge", posPayload.map(p => p.id).join(",")],
     queryFn:  () => fetchHedgeAnalysis(posPayload),
     enabled:  positions.length > 0,
     staleTime: 30_000,
     refetchInterval: 60_000,
+    retry: 1,
   });
 
   const hedgeMut = useMutation({
@@ -259,8 +240,23 @@ export default function AIHedgeManager() {
         </div>
       )}
 
+      {/* Query error — previously failed fetches left the page silently
+          showing zero suggestions with no explanation */}
+      {isError && !isLoading && (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/[0.04] py-16 text-center">
+          <AlertCircle size={28} className="mb-3 text-rose-400" />
+          <p className="text-[13px] font-bold text-rose-400">Hedge analysis unavailable</p>
+          <p className="mt-1 text-[12px] text-slate-500">
+            {hedgeQueryError instanceof Error ? hedgeQueryError.message : "Failed to compute correlations."}
+          </p>
+          <button onClick={() => refetch()} className="mt-4 rounded-xl border border-rose-400/25 px-4 py-2 text-[12px] font-bold text-rose-300 hover:bg-rose-400/10">
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Suggestions */}
-      {!isLoading && suggestions.length > 0 && (
+      {!isLoading && !isError && suggestions.length > 0 && (
         <div className="space-y-5">
           {suggestions.map(h => {
             const isApplied = applied.has(h.positionId);

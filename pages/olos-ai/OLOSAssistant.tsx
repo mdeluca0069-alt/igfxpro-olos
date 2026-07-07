@@ -12,6 +12,7 @@ import { useAiStore }      from "../../store/ai.store";
 import { useMarketStore }  from "../../store/market.store";
 import { useTradingStore } from "../../store/trading.store";
 import { tokenVault }      from "../../shared/lib/tokenVault";
+import { getClientEnv }   from "../../shared/config/clientEnv";
 
 type Message = {
   id:   string;
@@ -38,12 +39,13 @@ async function streamChat(
   signal: AbortSignal,
 ): Promise<void> {
   const token = tokenVault.getAccessToken();
-  const res = await fetch("/api/v1/ai/chat", {
+  const res = await fetch(`${getClientEnv().API_BASE_URL}/api/v1/ai/chat`, {
     method:  "POST",
     headers: {
       "Content-Type":  "application/json",
       "Authorization": token ? `Bearer ${token}` : "",
     },
+    credentials: "include",
     body:   JSON.stringify({ message, context }),
     signal,
   });

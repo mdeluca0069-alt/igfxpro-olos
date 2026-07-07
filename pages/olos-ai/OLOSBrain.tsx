@@ -62,6 +62,7 @@ export default function OLOSBrain() {
   const getActiveSignals = useAiStore((s) => s.getActiveSignals);
   const getOverallConfidenceScore = useAiStore((s) => s.getOverallConfidenceScore);
   const lastFetchAt = useAiStore((s) => s.lastFetchAt);
+  const aiError = useAiStore((s) => s.error);
 
   const connected = useMarketStore((s) => s.connected);
   const quotes = useMarketStore((s) => s.quotes);
@@ -73,10 +74,12 @@ export default function OLOSBrain() {
   const fetchOrders = useTradingStore((s) => s.fetchOrders);
   const fetchPositions = useTradingStore((s) => s.fetchPositions);
   const subWsTrading = useTradingStore((s) => s.subscribeWs);
+  const ordersError = useTradingStore((s) => s.ordersError);
 
   const snapshot = useRiskStore((s) => s.snapshot);
   const fetchSnapshot = useRiskStore((s) => s.fetchSnapshot);
   const subWsRisk = useRiskStore((s) => s.subscribeWs);
+  const riskError = useRiskStore((s) => s.error);
 
   const [uptimeSeconds, setUptimeSeconds] = useState(0);
 
@@ -276,11 +279,15 @@ export default function OLOSBrain() {
             </h2>
             <div className="space-y-2.5">
               {[
-                { label: "Signal Engine", ok: true },
+                { label: "Signal Engine", ok: lastFetchAt !== null && !aiError },
                 { label: "Market Feed", ok: connected },
-                { label: "Risk Monitor", ok: snapshot !== null },
-                { label: "Order Engine", ok: true },
-                { label: "Data Pipeline", ok: signals.length > 0 },
+                { label: "Risk Monitor", ok: snapshot !== null && !riskError },
+                { label: "Order Engine", ok: !ordersError },
+                // A real 0-signal tick (technical setup gate not met) is a
+                // normal outcome of the signal generator, not a failure —
+                // "ok" reflects whether the pipeline itself last synced
+                // successfully, not whether it happened to find a setup.
+                { label: "Data Pipeline", ok: lastFetchAt !== null && !aiError },
               ].map(({ label, ok }) => (
                 <div key={label} className="flex items-center justify-between">
                   <span className="text-[11px] text-slate-400">{label}</span>

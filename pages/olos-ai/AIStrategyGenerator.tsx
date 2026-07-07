@@ -11,7 +11,7 @@ import {
   Activity, Brain,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { tokenVault } from "../../shared/lib/tokenVault";
+import { apiPost } from "../../shared/lib/apiHelpers";
 
 const SYMBOLS: string[] = ["EURUSD", "XAUUSD", "US500", "BTCUSD", "GBPUSD", "USDJPY", "GBPJPY", "ETHUSD", "US100", "USDCHF"];
 const TIMEFRAMES: string[] = ["5M", "15M", "1H", "4H", "1D"];
@@ -52,17 +52,7 @@ type StrategyResult = {
 async function generateStrategy(params: {
   symbol: string; timeframe: string; riskLevel: RiskLevel;
 }): Promise<StrategyResult> {
-  const token = tokenVault.getAccessToken();
-  const res = await fetch("/api/v1/ai/strategy", {
-    method: "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": token ? `Bearer ${token}` : "",
-    },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) throw new Error(`Strategy API error: ${res.status}`);
-  return res.json();
+  return apiPost<StrategyResult>("/api/v1/ai/strategy", params);
 }
 
 const RISK_COLORS: Record<RiskLevel, string> = {
